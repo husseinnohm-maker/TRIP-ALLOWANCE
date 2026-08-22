@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Allowance Engine</title>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- xlsx-js-style for Excel Parsing and Premium Export Formatting -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #1d4ed8; font-weight: 600; }
+        .tab-inactive { color: #64748b; font-weight: 500; }
+        .tab-inactive:hover { color: #334155; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, Fragment } = React;
+
+        const Truck = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>);
+        const FileSpreadsheet = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>);
+        const Settings = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>);
+        const ChevronDown = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>);
+        const ChevronUp = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>);
+        const AlertCircle = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>);
+        const Download = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>);
+        const Search = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
+        const LayoutDashboard = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>);
+        const List = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>);
+        const Activity = ({size=24, className=""}) => (<svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>);
+
+        function App() {
+            const [ddrFile, setDdrFile] = useState(null);
+            const [tmsFile, setTmsFile] = useState(null);
+            const [convFile, setConvFile] = useState(null);
+            const [palletFile, setPalletFile] = useState(null);
+            const [usePalletFile, setUsePalletFile] = useState(false);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [results, setResults] = useState(null);
+            const [error, setError] = useState('');
+            const [expandedDrivers, setExpandedDrivers] = useState({});
+            const [expandedTrucks, setExpandedTrucks] = useState({});
+            const [showSettings, setShowSettings] = useState(false);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [settingsTab, setSettingsTab] = useState('general'); // Added for new settings UI
+
+            // Core Allowance Settings
+            const [settings, setSettings] = useState({
+                localCities: 'Riyadh, Buraidah, Buraida, Jeddah, Khobar, Madinah, Khamis',
+                upcountryDefaultRate: 0,
+                rateUnder700: 0.6,
+                rateOver700: 50,
+                palletRate: 8,
+                otherTripRate: 30,
+                secondTrip5t: 50,
+                secondTrip7t10t: 75,
+                secondTrip20t: 100
+            });
+
+            // New states for dynamic Upcountry Destinations & Rates
+            const [upcountryRates, setUpcountryRates] = useState({});
+            const [discoveredDests, setDiscoveredDests] = useState([]);
+
+            const handleSettingChange = (e) => {
+                const { name, value } = e.target;
+                setSettings(prev => ({ ...prev, [name]: name === 'localCities' ? value : parseFloat(value) || 0 }));
+            };
+
+            const handleUpcountryRateChange = (dest, value) => {
+                setUpcountryRates(prev => ({ ...prev, [dest]: parseFloat(value) || 0 }));
+            };
+
+            const toggleDriver = (driverId) => {
+                setExpandedDrivers(prev => ({ ...prev, [driverId]: !prev[driverId] }));
+            };
+
+            const toggleTruck = (truckId) => {
+                setExpandedTrucks(prev => ({ ...prev, [truckId]: !prev[truckId] }));
+            };
+
+            const formatDateStr = (val) => {
+                if (!val) return '';
+                if (val instanceof Date) {
+                    // Extract via UTC for SheetJS cellDates to avoid local timezone shifts pushing it back a day
+                    const y = val.getUTCFullYear();
+                    const m = String(val.getUTCMonth() + 1).padStart(2, '0');
+                    const d = String(val.getUTCDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+                const strVal = String(val).trim();
+                
+                // Handle formats like DD/MM/YYYY or DD-MM-YYYY
+                const parts = strVal.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+                if (parts) {
+                    let m = parseInt(parts[2], 10);
+                    let d = parseInt(parts[1], 10);
+                    if (m > 12) { const tmp = m; m = d; d = tmp; } // Swap if MM-DD-YYYY
+                    return `${parts[3]}-${m.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
+                }
+
+                // Handle string formats like "1-Jun-26" explicitly
+                const monthMap = { 'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12 };
+                const strParts = strVal.split(/[-/ ]/);
+                if (strParts.length === 3) {
+                    const d = parseInt(strParts[0], 10);
+                    const mStr = strParts[1].toLowerCase().substring(0,3);
+                    const m = monthMap[mStr];
+                    let y = parseInt(strParts[2], 10);
+                    
+                    if (m && !isNaN(d) && !isNaN(y)) {
+                        // Adjust 2 digit years (e.g., '26' to '2026')
+                        if (y < 100) y += 2000;
+                        return `${y}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+                    }
+                }
+
+                // Last resort fallback
+                const parsed = new Date(strVal);
+                if (!isNaN(parsed.getTime())) {
+                    const py = parsed.getFullYear();
+                    const pm = String(parsed.getMonth() + 1).padStart(2, '0');
+                    const pd = String(parsed.getDate()).padStart(2, '0');
+                    return `${py}-${pm}-${pd}`;
+                }
+                return strVal.split(' ')[0];
+            };
+
+            const parseExcelFile = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            // Enable cellDates to parse Excel serial dates accurately into JS Dates
+                            const workbook = window.XLSX.read(data, { type: 'array', cellDates: true });
+                            const firstSheetName = workbook.SheetNames[0];
+                            const firstSheet = workbook.Sheets[firstSheetName];
+                            const jsonData = window.XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+                            resolve(jsonData);
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    reader.onerror = (err) => reject(err);
+                    reader.readAsArrayBuffer(file);
+                });
+            };
+
+            const normalizeRow = (row, source) => {
+                const getVal = (possibleKeys) => {
+                    const key = Object.keys(row).find(k => {
+                        const norm = k.toLowerCase().trim().replace(/_/g, ' ');
+                        return possibleKeys.some(pk => norm === pk || norm.includes(pk));
+                    });
+                    return key !== undefined ? row[key] : '';
+                };
+
+                const driverId = String(getVal(['driver id', 'drivercode', 'driver code', 'driver #', 'emp id', 'employee id']) || '').trim();
+                const driverName = String(getVal(['driver name', 'name', 'employee name', 'driver']) || '').trim();
+                const tripId = String(getVal(['trip id', 'trip no', 'trip card', 'shipment id', 'shipment', 'route id', 'route']) || '').trim();
+                const orderNo = String(getVal(['order number', 'order no', 'order id', 'delivery no', 'delivery number', 'delivery', 'sales order', 'so number']) || '').trim();
+                const invoiceNo = String(getVal(['invoice number', 'invoice no', 'invoice', 'inv number', 'inv']) || '').trim();
+                // Expanded Site Reference matching (Prioritizing "Warehouse" based on the new unified TMS/DDR format)
+                const siteRef = String(getVal(['warehouse', 'current branch', 'site reference', 'site ref', 'site', 'branch', 'wh', 'plant', 'dc']) || '').trim().toUpperCase();
+                
+                const dateRaw = getVal(['plan date', 'date', 'actual receiveing date', 'ship date', 'delivery date', 'creation date', 'trip date']);
+                const date = formatDateStr(dateRaw);
+                
+                // Expanded Destination matching
+                const dest = getVal(['destination city', 'destination', 'city', 'ship to city', 'shipto city']);
+                const cityDesc = getVal(['city description', 'city discreption', 'region', 'area', 'zone']);
+
+                const qty = parseFloat(getVal(['adj qty', 'manual qty', 'quantity', 'qty', 'delivered qty', 'gross qty', 'cases', 'total cases', 'delivery qty', 'case qty'])) || 0;
+                
+                const retCases = parseFloat(getVal(['returned no cases', 'return cases', 'returned cases', 'return qty', 'returned'])) || 0;
+                const partialRetCases = parseFloat(getVal(['partial return', 'partial qty', 'partial'])) || 0;
+                
+                // Read DDR/TMS Pallets purely as "Dispatched" for indication
+                const palletsDispatched = parseFloat(getVal(['no of pallets', 'pallets', 'dispatched pallets', 'pallet qty'])) || 0;
+
+                const vehicleType = getVal(['vehicle type', 'truck type', 'truck', 'asset type', 'equipment', 'equipment type']);
+                const vehicleNo = getVal(['plate number', 'vehicle number', 'truck number', 'plate no', 'plate', 'truck #']);
+                
+                // Exclude Invoice Status/Invoice Receive Status for DDR -> Only read generic status if TMS
+                let status = '';
+                if (source === 'DDR') {
+                    // Purposefully skipping Invoice Status / Invoice Receive Status. Only basic Status if any.
+                    status = getVal(['status']); 
+                } else {
+                    status = getVal(['status', 'pod status']);
+                }
+                
+                const orderType = getVal(['order type', 'type', 'trx type']) || '';
+
+                // VALIDATIONS
+                let isValid = true;
+                const sStr = String(status).toLowerCase();
+                
+                if (source === 'DDR') {
+                    // Kept flexible as per requirement to exclude DDR invoice statuses. Only fail explicit broad cancels.
+                    if (sStr === 'cancelled') isValid = false;
+                } else if (source === 'TMS') {
+                    if (!sStr.includes('deliver') && !sStr.includes('return')) isValid = false;
+                    if (sStr.includes('cancel') || sStr.includes('assign')) isValid = false;
+                }
+
+                const orderTypeStr = String(orderType).toLowerCase();
+                const isOther = ['str', 'cross dock', 'rtv', 'gcn'].some(k => orderTypeStr.includes(k) || sStr.includes(k));
+
+                let tonnage = 7; // Default
+                const vStr = String(vehicleType).toLowerCase();
+                if (vStr.includes('20') || vStr.includes('trailer') || vStr.includes('hd 170')) tonnage = 20;
+                else if (vStr.includes('10')) tonnage = 10;
+                else if (vStr.includes('7') || vStr.includes('hd 78') || vStr.includes('hd 72')) tonnage = 7;
+                else if (vStr.includes('5') || vStr.includes('dyna')) tonnage = 5;
+
+                return {
+                    isValid, source, driverId, driverName, tripId, orderNo, invoiceNo, siteRef, date, 
+                    dest, cityDesc, qty, originalQty: qty, retCases, partialRetCases, totalRet: retCases + partialRetCases,
+                    palletsDispatched, vehicleType, vehicleNo, tonnage, isOther, status: String(status) || 'Processed'
+                };
+            };
+
+            const processData = async () => {
+                if (!ddrFile && !tmsFile) {
+                    setError('Please upload at least one file (DDR or TMS) to proceed.');
+                    return;
+                }
+                if (!window.XLSX) {
+                    setError('Excel library not loaded. Check internet connection.');
+                    return;
+                }
+
+                setIsProcessing(true);
+                setError('');
+
+                try {
+                    let allRows = [];
+                    if (ddrFile) {
+                        const ddrData = await parseExcelFile(ddrFile);
+                        allRows = allRows.concat(ddrData.map(r => normalizeRow(r, 'DDR')).filter(r => r.isValid && r.driverId));
+                    }
+                    if (tmsFile) {
+                        const tmsData = await parseExcelFile(tmsFile);
+                        allRows = allRows.concat(tmsData.map(r => normalizeRow(r, 'TMS')).filter(r => r.isValid && r.driverId));
+                    }
+
+                    // --- NEW CONVERSION SHEET LOGIC ---
+                    let convTotals = {};
+                    if (convFile) {
+                        const rawConvData = await parseExcelFile(convFile);
+                        rawConvData.forEach(row => {
+                            const getVal = (possibleKeys) => {
+                                const key = Object.keys(row).find(k => possibleKeys.some(pk => k.toLowerCase().trim() === pk.toLowerCase()));
+                                return key ? String(row[key]).trim() : '';
+                            };
+                            
+                            const o = getVal(['order number', 'order no', 'order id', 'delivery', 'delivery no', 'delivery number']);
+                            const i = getVal(['invoice number', 'invoice no']);
+                            const s = String(getVal(['site reference', 'site ref', 'site', 'branch', 'warehouse', 'wh'])).toUpperCase().trim();
+                            const qty = parseFloat(getVal(['cases', 'case qty', 'qty', 'quantity', 'converted qty', 'total cases'])) || 0;
+                            
+                            // Build lookup keys STRICTLY requiring Warehouse (Site) matching
+                            const keys = [];
+                            if (o && s) keys.push(`O:${o}_S:${s}`);
+                            if (i && s) keys.push(`I:${i}_S:${s}`);
+                            
+                            keys.forEach(k => {
+                                if (convTotals[k] === undefined) convTotals[k] = 0;
+                                convTotals[k] += qty;
+                            });
+                        });
+                    }
+
+                    // --- NEW MANUAL PALLET FILE LOGIC ---
+                    let manualPallets = [];
+                    if (usePalletFile && palletFile) {
+                        const rawPalletData = await parseExcelFile(palletFile);
+                        rawPalletData.forEach(row => {
+                            // Upgraded to 'fuzzy matching' to catch variations like "Truck #" or "Good Pallets Return"
+                            const getVal = (possibleKeys) => {
+                                const key = Object.keys(row).find(k => {
+                                    const norm = k.toLowerCase().trim();
+                                    return possibleKeys.some(pk => norm === pk.toLowerCase() || norm.includes(pk.toLowerCase()));
+                                });
+                                return key !== undefined ? row[key] : '';
+                            };
+                            
+                            const dateRaw = getVal(['date', 'trip date', 'return date', 'date of return', 'plan date']);
+                            const date = formatDateStr(dateRaw);
+                            
+                            const truckRaw = getVal(['truck #', 'truck', 'truck no', 'vehicle', 'plate', 'vehicle type']);
+                            const truckDigits = String(truckRaw).replace(/\D/g, ''); 
+                            
+                            const tripRaw = getVal(['trip id', 'trip', 'shipment', 'trip no']);
+                            const tripDigits = String(tripRaw).replace(/\D/g, ''); 
+                            
+                            const qty = parseFloat(getVal(['good pallets return', 'good', 'good pallets', 'good pallet', 'pallets', 'qty', 'return', 'empty', 'returned cases', 'returned'])) || 0;
+                            
+                            if (qty > 0 && date && (truckDigits || tripDigits)) {
+                                manualPallets.push({ date, truckDigits, tripDigits, qty });
+                            }
+                        });
+                    }
+
+                    // Extract the city classifications from DDR dynamically
+                    const cityClassificationMap = {};
+                    allRows.forEach(r => {
+                        if (r.source === 'DDR' && r.dest && r.cityDesc) {
+                            const dLow = String(r.dest).trim().toLowerCase();
+                            const cDescLow = String(r.cityDesc).toLowerCase();
+                            if (cDescLow.includes('local')) {
+                                cityClassificationMap[dLow] = 'local';
+                            } else if (cDescLow.includes('upcountry') || cDescLow.includes('up country')) {
+                                cityClassificationMap[dLow] = 'upcountry';
+                            }
+                        }
+                    });
+
+                    // Helper to determine Home City based on Warehouse Code
+                    const getHomeCityFromSite = (siteCode) => {
+                        const s = String(siteCode).toUpperCase();
+                        if (s.includes('QW1') || s.includes('JW1')) return 'JEDDAH';
+                        if (s.includes('RW1') || s.includes('RW2')) return 'RIYADH';
+                        if (s.includes('AW1') || s.includes('AW2')) return 'KHOBAR';
+                        if (s.includes('BW1')) return 'BURAIDAH';
+                        if (s.includes('KW1')) return 'KHAMIS'; // Khamis Mushayet
+                        if (s.includes('MW1')) return 'MADINAH';
+                        return null; // Unknown/Fallback
+                    };
+
+                    // RULE: Split quantities across multiple trucks for same Order Number with duplicated quantities
+                    const rowsByOrder = {};
+                    allRows.forEach(r => {
+                        const groupKey = r.orderNo || r.invoiceNo;
+                        if (groupKey) {
+                            const key = `${r.source}_${groupKey}`;
+                            if (!rowsByOrder[key]) rowsByOrder[key] = [];
+                            rowsByOrder[key].push(r);
+                        }
+                    });
+
+                    Object.values(rowsByOrder).forEach(group => {
+                        if (group.length > 0) {
+                            const firstRow = group[0];
+                            const o = firstRow.orderNo;
+                            const i = firstRow.invoiceNo;
+                            const s = String(firstRow.siteRef || '').toUpperCase().trim();
+                            
+                            let trueTotalQty = null;
+                            
+                            // Check Conversion Sheet for the verified total quantity (Strictly requiring Warehouse/Site match)
+                            if (o && s && convTotals[`O:${o}_S:${s}`] !== undefined) trueTotalQty = convTotals[`O:${o}_S:${s}`];
+                            else if (i && s && convTotals[`I:${i}_S:${s}`] !== undefined) trueTotalQty = convTotals[`I:${i}_S:${s}`];
+
+                            if (trueTotalQty !== null) {
+                                // Conversion sheet dictates the absolute truth. Split it equally among the lines.
+                                const splitQty = trueTotalQty / group.length;
+                                group.forEach(r => {
+                                    r.qty = splitQty;
+                                    if (group.every(x => x.retCases === group[0].retCases)) r.retCases /= group.length;
+                                    if (group.every(x => x.partialRetCases === group[0].partialRetCases)) r.partialRetCases /= group.length;
+                                    r.totalRet = r.retCases + r.partialRetCases;
+                                });
+                            } else if (group.length > 1) {
+                                // Fallback logic: If identical duplicated quantities exist across trucks, split them.
+                                const firstQty = group[0].qty;
+                                const allSameQty = group.every(r => r.qty === firstQty);
+                                if (allSameQty && firstQty > 0) {
+                                    group.forEach(r => {
+                                        r.qty = r.qty / group.length;
+                                        if (group.every(x => x.retCases === group[0].retCases)) r.retCases /= group.length;
+                                        if (group.every(x => x.partialRetCases === group[0].partialRetCases)) r.partialRetCases /= group.length;
+                                        r.totalRet = r.retCases + r.partialRetCases;
+                                    });
+                                }
+                            }
+                        }
+                    });
+
+                    // Group strictly by Driver + Date + Truck + Trip ID to ensure accurate Second Trip Calculation
+                    const tripsMap = {};
+                    allRows.forEach(r => {
+                        // Use Trip ID as primary key to group multiple orders into ONE trip. Fallback to Order No if Trip ID is missing.
+                        const identifier = r.tripId || r.orderNo || `unknown_${Math.random()}`;
+                        const truckKey = r.vehicleNo || r.vehicleType || 'UnknownTruck';
+                        const key = `${r.driverId}_${r.date}_${truckKey}_${identifier}`;
+                        
+                        if (!tripsMap[key]) {
+                            tripsMap[key] = { ...r, qty: 0, retCases: 0, partialRetCases: 0, totalRet: 0, palletsDispatched: 0, palletsReturned: 0, destinations: [] };
+                        }
+                        tripsMap[key].qty += r.qty;
+                        tripsMap[key].retCases += r.retCases;
+                        tripsMap[key].partialRetCases += r.partialRetCases;
+                        tripsMap[key].totalRet += r.totalRet;
+                        tripsMap[key].palletsDispatched += r.palletsDispatched; // Accumulate dispatched pallets for indication
+                        if (r.isOther) tripsMap[key].isOther = true;
+                        
+                        if (r.cityDesc) {
+                            const cDesc = String(r.cityDesc).toLowerCase();
+                            if (cDesc.includes('upcountry') || cDesc.includes('up country')) {
+                                tripsMap[key].cityDesc = 'upcountry';
+                            } else if (!tripsMap[key].cityDesc && cDesc.includes('local')) {
+                                tripsMap[key].cityDesc = 'local';
+                            }
+                        }
+                        
+                        const currentDest = String(r.dest).trim();
+                        if (currentDest && !tripsMap[key].destinations.includes(currentDest)) {
+                            tripsMap[key].destinations.push(currentDest);
+                        }
+                    });
+
+                    // --- APPLY MANUAL PALLET OVERRIDES (Highly Reliable Trip ID + Date Fallback) ---
+                    if (usePalletFile && palletFile) {
+                        const allTrips = Object.values(tripsMap);
+
+                        manualPallets.forEach(mp => {
+                            let matchedTrip = null;
+                            
+                            // A. Try Matching by Trip ID globally (Safest route, bypasses any date shifts)
+                            if (mp.tripDigits) {
+                                matchedTrip = allTrips.find(t => t.tripId && String(t.tripId).replace(/\D/g, '').endsWith(mp.tripDigits));
+                            }
+                            
+                            // B. Fallback to matching by Date + Truck Number
+                            if (!matchedTrip && mp.truckDigits && mp.date) {
+                                matchedTrip = allTrips.find(t => t.date === mp.date && 
+                                    ((t.vehicleNo && String(t.vehicleNo).replace(/\D/g, '').includes(mp.truckDigits)) || 
+                                     (t.vehicleType && String(t.vehicleType).replace(/\D/g, '').includes(mp.truckDigits)))
+                                );
+                            }
+
+                            if (matchedTrip) {
+                                matchedTrip.palletsReturned += mp.qty; // ONLY populate Pallets Returned from the manual file
+                            }
+                        });
+                    }
+
+                    // Assign Trips to Drivers by Date
+                    const driverMap = {};
+                    Object.values(tripsMap).forEach(t => {
+                        if (!driverMap[t.driverId]) driverMap[t.driverId] = { driverId: t.driverId, driverName: t.driverName, dates: {} };
+                        if (!driverMap[t.driverId].dates[t.date]) driverMap[t.driverId].dates[t.date] = [];
+                        driverMap[t.driverId].dates[t.date].push(t);
+                    });
+
+                    const localCitiesList = settings.localCities.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                    let finalDrivers = [];
+                    const discoveredUpc = new Set(); // To track unique upcountry destinations
+
+                    Object.values(driverMap).forEach(d => {
+                        let dTrips = [];
+                        Object.keys(d.dates).sort().forEach(dateStr => {
+                            const dailyTrips = d.dates[dateStr];
+                            dailyTrips.forEach((trip, index) => {
+                                // Rule: Removing both return cases and partial return cases
+                                const netQty = Math.max(0, trip.qty - trip.totalRet);
+                                const finalDestination = trip.destinations.length > 0 ? trip.destinations[trip.destinations.length - 1] : "";
+                                const finalDestLower = String(finalDestination).toLowerCase().trim();
+                                const destKey = String(finalDestination).trim().toUpperCase();
+                                
+                                let isLocal = true; // Default Fallback
+                                const homeCity = getHomeCityFromSite(trip.siteRef);
+                                
+                                // NEW LOGIC: Prioritize Warehouse Code matching to determine Upcountry vs Local
+                                if (homeCity) {
+                                    if (finalDestLower.includes(homeCity.toLowerCase()) || 
+                                       (homeCity === 'KHAMIS' && finalDestLower.includes('mushayet'))) {
+                                        isLocal = true;
+                                    } else {
+                                        isLocal = false;
+                                    }
+                                } else {
+                                    // FALLBACK LOGIC: If warehouse code is missing/unknown, rely on cityDesc or settings list
+                                    const tripCityDesc = String(trip.cityDesc || '').toLowerCase();
+                                    if (tripCityDesc.includes('upcountry') || tripCityDesc.includes('up country')) {
+                                        isLocal = false;
+                                    } else if (tripCityDesc.includes('local')) {
+                                        isLocal = true;
+                                    } else if (cityClassificationMap[finalDestLower] === 'upcountry') {
+                                        isLocal = false;
+                                    } else if (cityClassificationMap[finalDestLower] === 'local') {
+                                        isLocal = true;
+                                    } else {
+                                        isLocal = localCitiesList.some(lc => finalDestLower.includes(lc));
+                                    }
+                                }
+                                
+                                let localAllow = 0, upcAllow = 0, secondAllow = 0, palletAllow = trip.palletsReturned * settings.palletRate, otherAllow = trip.isOther ? settings.otherTripRate : 0;
+
+                                if (isLocal) {
+                                    if (netQty < 700) localAllow = netQty * settings.rateUnder700;
+                                    else localAllow = settings.rateOver700;
+                                } else {
+                                    // Capture destination for the dynamic UI
+                                    if (destKey) discoveredUpc.add(destKey);
+                                    // Apply dynamically mapped rate, otherwise default to 0
+                                    upcAllow = upcountryRates[destKey] !== undefined ? upcountryRates[destKey] : settings.upcountryDefaultRate; 
+                                }
+
+                                if (index > 0) {
+                                    if (trip.tonnage === 20) secondAllow = settings.secondTrip20t;
+                                    else if (trip.tonnage >= 7) secondAllow = settings.secondTrip7t10t;
+                                    else secondAllow = settings.secondTrip5t;
+                                }
+
+                                const tripTotal = localAllow + upcAllow + secondAllow + palletAllow + otherAllow;
+                                
+                                dTrips.push({
+                                    ...trip, netQty, isLocal, pathStr: trip.destinations.join(' -> ') || 'Unknown',
+                                    localAllow, upcAllow, secondAllow, palletAllow, otherAllow, tripTotal
+                                });
+                            });
+                        });
+
+                        if (dTrips.length > 0) {
+                            finalDrivers.push({
+                                driverId: d.driverId,
+                                driverName: d.driverName,
+                                trips: dTrips
+                            });
+                        }
+                    });
+
+                    finalDrivers.sort((a, b) => {
+                        const sumA = a.trips.reduce((acc, t) => acc + t.tripTotal, 0);
+                        const sumB = b.trips.reduce((acc, t) => acc + t.tripTotal, 0);
+                        return sumB - sumA;
+                    });
+
+                    // Store discovered destinations sorted alphabetically
+                    setDiscoveredDests(Array.from(discoveredUpc).sort());
+
+                    setResults({ originalDrivers: finalDrivers });
+                    setExpandedDrivers({});
+                    setActiveTab('dashboard');
+                } catch (err) {
+                    console.error(err);
+                    setError('An error occurred during processing. Ensure files are valid.');
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            const displayData = useMemo(() => {
+                if (!results) return null;
+                const searchLower = searchTerm.toLowerCase().trim();
+                
+                let drivers = results.originalDrivers.map(d => {
+                    const driverMatch = String(d.driverId).toLowerCase().includes(searchLower) || (d.driverName && String(d.driverName).toLowerCase().includes(searchLower));
+                    
+                    const matchedTrips = d.trips.filter(t => 
+                        driverMatch ||
+                        (t.tripId && String(t.tripId).toLowerCase().includes(searchLower)) ||
+                        (t.orderNo && String(t.orderNo).toLowerCase().includes(searchLower)) ||
+                        (t.invoiceNo && String(t.invoiceNo).toLowerCase().includes(searchLower)) ||
+                        (t.vehicleType && String(t.vehicleType).toLowerCase().includes(searchLower)) ||
+                        (t.vehicleNo && String(t.vehicleNo).toLowerCase().includes(searchLower)) ||
+                        (t.date && String(t.date).toLowerCase().includes(searchLower))
+                    );
+
+                    const metrics = matchedTrips.reduce((acc, t) => {
+                        acc.dLocal += t.localAllow; acc.dUpc += t.upcAllow; acc.dSecond += t.secondAllow;
+                        acc.dPallet += t.palletAllow; acc.dOther += t.otherAllow; acc.dTotal += t.tripTotal;
+                        return acc;
+                    }, { dLocal: 0, dUpc: 0, dSecond: 0, dPallet: 0, dOther: 0, dTotal: 0 });
+
+                    return { ...d, ...metrics, trips: matchedTrips };
+                }).filter(d => d.trips.length > 0);
+
+                const kpis = drivers.reduce((acc, d) => {
+                    acc.totalDrivers++;
+                    acc.totalTrips += d.trips.length;
+                    acc.totalAllowance += d.dTotal;
+                    return acc;
+                }, { totalDrivers: 0, totalTrips: 0, totalAllowance: 0 });
+
+                // TRUCK ANALYSIS GROUPING
+                let trucksMap = {};
+                drivers.forEach(d => {
+                    d.trips.forEach(t => {
+                        const vNo = t.vehicleNo || t.vehicleType || 'Unknown-Asset';
+                        if (!trucksMap[vNo]) {
+                            trucksMap[vNo] = {
+                                vehicleNo: vNo,
+                                vehicleType: t.vehicleType,
+                                tonnage: t.tonnage,
+                                datesSet: new Set(),
+                                trips: [],
+                                totalQty: 0,
+                                totalPalletsDispatched: 0,
+                                totalPalletsReturned: 0,
+                                totalAllowance: 0
+                            };
+                        }
+                        
+                        trucksMap[vNo].datesSet.add(t.date);
+                        trucksMap[vNo].trips.push({...t, driverName: d.driverName, driverId: d.driverId});
+                        trucksMap[vNo].totalQty += t.netQty;
+                        trucksMap[vNo].totalPalletsDispatched += t.palletsDispatched;
+                        trucksMap[vNo].totalPalletsReturned += t.palletsReturned;
+                        trucksMap[vNo].totalAllowance += t.tripTotal;
+                    });
+                });
+
+                let trucks = Object.values(trucksMap)
+                    .filter(t => t.trips.length > 0)
+                    .map(t => ({
+                        ...t,
+                        activeDays: t.datesSet.size,
+                        totalTrips: t.trips.length,
+                    }))
+                    .sort((a, b) => b.totalTrips - a.totalTrips);
+
+                // Group truck trips by date for the expanded view
+                trucks.forEach(truck => {
+                    const groupedByDate = {};
+                    truck.trips.forEach(t => {
+                        if (!groupedByDate[t.date]) groupedByDate[t.date] = [];
+                        groupedByDate[t.date].push(t);
+                    });
+                    truck.tripsByDate = Object.keys(groupedByDate).sort().map(date => ({
+                        date,
+                        trips: groupedByDate[date],
+                        dailyQty: groupedByDate[date].reduce((sum, t) => sum + t.netQty, 0),
+                        dailyPalletsDispatched: groupedByDate[date].reduce((sum, t) => sum + t.palletsDispatched, 0),
+                        dailyPalletsReturned: groupedByDate[date].reduce((sum, t) => sum + t.palletsReturned, 0),
+                        dailyAllow: groupedByDate[date].reduce((sum, t) => sum + t.tripTotal, 0)
+                    }));
+                });
+
+                return { drivers, trucks, kpis };
+            }, [results, searchTerm]);
+
+            const exportToExcel = () => {
+                if (!displayData) return;
+                
+                // Helper to apply premium board-ready styling
+                const applyPremiumStyling = (ws) => {
+                    const range = window.XLSX.utils.decode_range(ws['!ref']);
+                    
+                    // Column Auto-Fit
+                    const colWidths = [];
+                    for(let R = range.s.r; R <= range.e.r; ++R) {
+                        for(let C = range.s.c; C <= range.e.c; ++C) {
+                            const address = window.XLSX.utils.encode_cell({r: R, c: C});
+                            if(!ws[address]) continue;
+                            const valStr = String(ws[address].v || '');
+                            colWidths[C] = Math.max(colWidths[C] || 12, valStr.length);
+                        }
+                    }
+                    ws['!cols'] = colWidths.map(w => ({ wch: Math.min(Math.max(w + 2, 12), 40) }));
+
+                    // Styling cells
+                    for(let R = range.s.r; R <= range.e.r; ++R) {
+                        for(let C = range.s.c; C <= range.e.c; ++C) {
+                            const address = window.XLSX.utils.encode_cell({r: R, c: C});
+                            if(!ws[address]) continue;
+
+                            let cellStyle = { 
+                                font: { name: 'Arial', sz: 10 },
+                                alignment: { vertical: "center" },
+                                border: {
+                                    top: { style: 'thin', color: { rgb: "E2E8F0" } },
+                                    bottom: { style: 'thin', color: { rgb: "E2E8F0" } },
+                                    left: { style: 'thin', color: { rgb: "E2E8F0" } },
+                                    right: { style: 'thin', color: { rgb: "E2E8F0" } }
+                                }
+                            };
+
+                            // Header row styling
+                            if(R === 0) {
+                                cellStyle = {
+                                    font: { name: 'Arial', sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+                                    fill: { fgColor: { rgb: "1E293B" } }, // slate-800
+                                    alignment: { horizontal: "center", vertical: "center" }
+                                };
+                            } else {
+                                // Number formatting & Alignment for data rows
+                                if(typeof ws[address].v === 'number') {
+                                    if(ws[address].v % 1 !== 0 || ws[address].v > 999) {
+                                        cellStyle.numFmt = "#,##0.00";
+                                        cellStyle.alignment = { horizontal: "right" };
+                                    } else {
+                                        cellStyle.numFmt = "#,##0";
+                                        cellStyle.alignment = { horizontal: "center" };
+                                    }
+                                }
+                                
+                                // Alternate row background coloring (Zebra stripping)
+                                if (R % 2 !== 0) {
+                                    cellStyle.fill = { fgColor: { rgb: "F8FAFC" } }; // slate-50
+                                }
+                            }
+                            ws[address].s = cellStyle;
+                        }
+                    }
+                };
+
+                // 1. Executive Summary Sheet
+                const summaryData = [
+                    { "Metric": "Total Active Drivers", "Value": displayData.kpis.totalDrivers },
+                    { "Metric": "Total Valid Processed Trips", "Value": displayData.kpis.totalTrips },
+                    { "Metric": "Total Allowance Calculated (SAR)", "Value": displayData.kpis.totalAllowance }
+                ];
+                const wsExec = window.XLSX.utils.json_to_sheet(summaryData);
+                applyPremiumStyling(wsExec);
+
+                // 2. Driver Ledger Sheet
+                const driverSummaryData = displayData.drivers.map(d => ({
+                    'Driver ID': d.driverId,
+                    'Driver Name': d.driverName,
+                    'Total Trips': d.trips.length,
+                    'Local Allowance': d.dLocal,
+                    'Upcountry Allowance': d.dUpc,
+                    '2nd Trip Allowance': d.dSecond,
+                    'Pallet Allowance': d.dPallet,
+                    'STR/Other Allowance': d.dOther,
+                    'Total Allowance (SAR)': d.dTotal
+                }));
+                const wsDriver = window.XLSX.utils.json_to_sheet(driverSummaryData);
+                applyPremiumStyling(wsDriver);
+
+                // 3. Truck Ledger Sheet
+                const truckSummaryData = displayData.trucks.map(t => ({
+                    'Vehicle Number': t.vehicleNo,
+                    'Vehicle Type': t.vehicleType,
+                    'Tonnage': t.tonnage,
+                    'Active Days': t.activeDays,
+                    'Total Trips': t.totalTrips,
+                    'Total Net Cases Delivered': t.totalQty,
+                    'Total Pallets Dispatched': t.totalPalletsDispatched,
+                    'Total Returned Pallets': t.totalPalletsReturned,
+                    'Allowances Generated (SAR)': t.totalAllowance
+                }));
+                const wsTruck = window.XLSX.utils.json_to_sheet(truckSummaryData);
+                applyPremiumStyling(wsTruck);
+
+                // 4. Detailed Data Formatted Sheet
+                const detailedData = [];
+                displayData.drivers.forEach(d => {
+                    d.trips.forEach(t => {
+                        detailedData.push({
+                            'Date': t.date,
+                            'Driver ID': d.driverId,
+                            'Driver Name': d.driverName,
+                            'Source Data': t.source,
+                            'Trip Card / ID': t.tripId,
+                            'Order Number': t.orderNo,
+                            'Invoice Number': t.invoiceNo,
+                            'Final Status': t.status,
+                            'Vehicle Type': t.vehicleType,
+                            'Vehicle Number': t.vehicleNo,
+                            'Tonnage': t.tonnage,
+                            'Destinations': t.pathStr,
+                            'Original Qty': t.originalQty,
+                            'Adjusted/Split Qty': t.qty,
+                            'Returned Cases': t.retCases,
+                            'Partial Return Qty': t.partialRetCases,
+                            'Net Payable Qty': t.netQty,
+                            'Pallets Dispatched': t.palletsDispatched,
+                            'Pallets Returned': t.palletsReturned,
+                            'Local Allow (SAR)': t.localAllow,
+                            'Upc Allow (SAR)': t.upcAllow,
+                            '2nd Trip Allow (SAR)': t.secondAllow,
+                            'Pallet Allow (SAR)': t.palletAllow,
+                            'STR/Other Allow (SAR)': t.otherAllow,
+                            'Total Trip Value (SAR)': t.tripTotal
+                        });
+                    });
+                });
+
+                const wsDetail = window.XLSX.utils.json_to_sheet(detailedData);
+                applyPremiumStyling(wsDetail);
+                
+                const wb = window.XLSX.utils.book_new();
+                window.XLSX.utils.book_append_sheet(wb, wsExec, "Executive Summary");
+                window.XLSX.utils.book_append_sheet(wb, wsDriver, "Driver Ledger");
+                window.XLSX.utils.book_append_sheet(wb, wsTruck, "Truck Analysis");
+                window.XLSX.utils.book_append_sheet(wb, wsDetail, "Detailed Raw Data");
+                
+                window.XLSX.writeFile(wb, `Logistics_Allowance_Dashboard_${new Date().toISOString().split('T')[0]}.xlsx`);
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-6 pb-20">
+                    <div className="max-w-7xl mx-auto space-y-6">
+                        
+                        {/* Header Section */}
+                        <header className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                            <div>
+                                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                                    <div className="bg-blue-100 p-2 rounded-lg text-blue-700">
+                                        <Truck size={28} />
+                                    </div>
+                                    Logistics Allowance Engine
+                                </h1>
+                                <p className="text-slate-500 mt-1 font-medium text-sm">DDR & TMS Processing • Advanced Deduplication • Reporting</p>
+                            </div>
+                            <button 
+                                onClick={() => setShowSettings(!showSettings)}
+                                className="mt-4 md:mt-0 flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors font-medium border border-slate-200"
+                            >
+                                <Settings size={18} />
+                                Allowance Rules & Rates
+                                {showSettings ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                        </header>
+
+                        {error && (
+                            <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-start gap-3 shadow-sm">
+                                <AlertCircle className="shrink-0 mt-0.5 text-red-500" size={20} />
+                                <p className="font-medium">{error}</p>
+                            </div>
+                        )}
+
+                        {showSettings && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
+                                <div className="flex border-b border-slate-200 bg-slate-50 text-sm font-semibold text-slate-600">
+                                    <button 
+                                        onClick={() => setSettingsTab('general')} 
+                                        className={`px-6 py-3 transition-colors ${settingsTab === 'general' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'hover:bg-slate-100'}`}
+                                    >
+                                        General Rules
+                                    </button>
+                                    <button 
+                                        onClick={() => setSettingsTab('upcountry')} 
+                                        className={`px-6 py-3 transition-colors ${settingsTab === 'upcountry' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'hover:bg-slate-100'}`}
+                                    >
+                                        Upcountry Destinations Rates
+                                    </button>
+                                </div>
+
+                                {settingsTab === 'general' && (
+                                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <div className="space-y-1.5 text-sm lg:col-span-4">
+                                            <label className="font-semibold text-slate-600">Fallback Local Cities (Comma separated)</label>
+                                            <input type="text" name="localCities" value={settings.localCities} onChange={handleSettingChange} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                            <p className="text-xs text-slate-400 mt-1">Used if Warehouse Code (e.g. QW1, RW1) is missing.</p>
+                                        </div>
+                                        <div className="space-y-1.5 text-sm">
+                                            <label className="font-semibold text-slate-600">Local &lt; 700 CS Rate</label>
+                                            <input type="number" step="0.1" name="rateUnder700" value={settings.rateUnder700} onChange={handleSettingChange} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1.5 text-sm">
+                                            <label className="font-semibold text-slate-600">Local &ge; 700 CS Rate</label>
+                                            <input type="number" name="rateOver700" value={settings.rateOver700} onChange={handleSettingChange} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1.5 text-sm">
+                                            <label className="font-semibold text-slate-600">Pallet Rate</label>
+                                            <input type="number" name="palletRate" value={settings.palletRate} onChange={handleSettingChange} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1.5 text-sm">
+                                            <label className="font-semibold text-slate-600">STR/Other Flat Rate</label>
+                                            <input type="number" name="otherTripRate" value={settings.otherTripRate} onChange={handleSettingChange} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1.5 text-sm">
+                                            <label className="font-semibold text-slate-600">2nd Trip: 5 Ton</label>
+                                            <input type="number" name="secondTrip5t" value={settings.secondTrip5t} onChange={handleSettingChange} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1.5 text-sm">
+                                            <label className="font-semibold text-slate-600">2nd Trip: 7T/10T</label>
+                                            <input type="number" name="secondTrip7t10t" value={settings.secondTrip7t10t} onChange={handleSettingChange} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1.5 text-sm">
+                                            <label className="font-semibold text-slate-600">2nd Trip: 20 Ton</label>
+                                            <input type="number" name="secondTrip20t" value={settings.secondTrip20t} onChange={handleSettingChange} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {settingsTab === 'upcountry' && (
+                                    <div className="p-6">
+                                        <div className="mb-4">
+                                            <p className="text-sm text-slate-600">
+                                                Assign distinct flat rates (SAR) for Upcountry destinations. Destinations are populated automatically after you process your files.
+                                            </p>
+                                        </div>
+                                        {discoveredDests.length === 0 ? (
+                                            <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-500 text-sm font-medium">
+                                                No upcountry destinations discovered yet. <br/>Upload your DDR/TMS files and click "Execute Calculation" to populate this list.
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                                {discoveredDests.map(dest => (
+                                                    <div key={dest} className="space-y-1.5 text-sm bg-slate-50 p-3 rounded-lg border border-slate-200 shadow-sm">
+                                                        <label className="font-bold text-slate-700 truncate block" title={dest}>{dest}</label>
+                                                        <input 
+                                                            type="number" 
+                                                            placeholder="0.00"
+                                                            value={upcountryRates[dest] || ''} 
+                                                            onChange={(e) => handleUpcountryRateChange(dest, e.target.value)} 
+                                                            className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" 
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {discoveredDests.length > 0 && (
+                                            <div className="mt-6 flex items-center justify-between bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                                <p className="text-sm text-blue-800 font-medium">After updating rates, re-run the calculation to apply them.</p>
+                                                <button onClick={processData} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors">
+                                                    Recalculate Allowances
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* File Upload Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                            <div className="md:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><FileSpreadsheet className="text-blue-500"/> Reports Upload</h3>
+                                <div className="space-y-4">
+                                    <div className="flex flex-col bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                        <label className="text-sm font-bold text-slate-700 mb-2">DDR Details Report (.xlsx)</label>
+                                        <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setDdrFile(e.target.files[0])} className="text-sm file:mr-4 file:py-2.5 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"/>
+                                        <p className="text-xs text-slate-400 mt-2">Will disregard specific Invoice Statuses implicitly.</p>
+                                    </div>
+                                    <div className="flex flex-col bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                        <label className="text-sm font-bold text-slate-700 mb-2">TMS Report (.xlsx)</label>
+                                        <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setTmsFile(e.target.files[0])} className="text-sm file:mr-4 file:py-2.5 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"/>
+                                    </div>
+                                    <div className="flex flex-col bg-amber-50 p-4 rounded-xl border border-amber-200">
+                                        <label className="text-sm font-bold text-slate-700 mb-2">Conversion Sheet (.xlsx)</label>
+                                        <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setConvFile(e.target.files[0])} className="text-sm file:mr-4 file:py-2.5 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer"/>
+                                        <p className="text-xs text-amber-700 mt-2">Optional: Cross-references Order/Invoice No & Site Ref to enforce absolute true quantities across duplicate truck lines.</p>
+                                    </div>
+                                    <div className="flex flex-col bg-purple-50 p-4 rounded-xl border border-purple-200 transition-all">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <input type="checkbox" id="usePallet" checked={usePalletFile} onChange={(e) => setUsePalletFile(e.target.checked)} className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 cursor-pointer" />
+                                            <label htmlFor="usePallet" className="text-sm font-bold text-slate-700 cursor-pointer select-none">Manual Empty Pallets Return</label>
+                                        </div>
+                                        {usePalletFile && (
+                                            <div className="mt-2 animate-fade-in">
+                                                <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setPalletFile(e.target.files[0])} className="text-sm file:mr-4 file:py-2.5 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"/>
+                                                <p className="text-xs text-purple-700 mt-2 font-medium">Overrides default DDR/TMS values. Matches via Date + (Truck No digits or Trip ID suffix).</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="md:col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-col justify-center items-center text-center">
+                                <button 
+                                    onClick={processData}
+                                    disabled={isProcessing}
+                                    className={`w-full py-4 px-6 rounded-xl text-white font-bold text-lg flex items-center justify-center gap-2 transition-all ${isProcessing ? 'bg-slate-700 cursor-not-allowed text-slate-400' : 'bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-blue-600/20'}`}
+                                >
+                                    {isProcessing ? 'Validating & Merging...' : 'Execute Calculation'}
+                                </button>
+                                <p className="text-slate-400 text-sm mt-4">Splits order quantities & deducts partial returns automatically.</p>
+                            </div>
+                        </div>
+
+                        {displayData && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-8">
+                                
+                                {/* Tools & Tabs Header */}
+                                <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row gap-4 justify-between items-center">
+                                    <div className="flex items-center gap-6 text-sm">
+                                        <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 pb-1 transition-all ${activeTab === 'dashboard' ? 'tab-active' : 'tab-inactive'}`}>
+                                            <LayoutDashboard size={18}/> Dashboard Summary
+                                        </button>
+                                        <button onClick={() => setActiveTab('ledger')} className={`flex items-center gap-2 pb-1 transition-all ${activeTab === 'ledger' ? 'tab-active' : 'tab-inactive'}`}>
+                                            <List size={18}/> Detailed Ledger
+                                        </button>
+                                        <button onClick={() => setActiveTab('trucks')} className={`flex items-center gap-2 pb-1 transition-all ${activeTab === 'trucks' ? 'tab-active' : 'tab-inactive'}`}>
+                                            <Activity size={18}/> Truck Analysis
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-3 w-full md:w-auto">
+                                        <div className="relative w-full md:w-64">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Search Order, Trip, Name..." 
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm whitespace-nowrap">
+                                            <Download size={16}/> Export Excel
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* DASHBOARD TAB */}
+                                {activeTab === 'dashboard' && (
+                                    <div className="p-6 bg-white animate-fade-in">
+                                        {/* Global KPIs */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                            <div className="border border-slate-100 bg-gradient-to-br from-emerald-50 to-white p-5 rounded-2xl shadow-sm">
+                                                <p className="text-emerald-700 text-sm font-bold uppercase tracking-wider mb-1">Total Value Calculated</p>
+                                                <p className="text-4xl font-black text-slate-900">{displayData.kpis.totalAllowance.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})} <span className="text-xl text-slate-500 font-bold">SAR</span></p>
+                                            </div>
+                                            <div className="border border-slate-100 bg-gradient-to-br from-blue-50 to-white p-5 rounded-2xl shadow-sm">
+                                                <p className="text-blue-700 text-sm font-bold uppercase tracking-wider mb-1">Processed Trips</p>
+                                                <p className="text-4xl font-black text-slate-900">{displayData.kpis.totalTrips.toLocaleString()}</p>
+                                            </div>
+                                            <div className="border border-slate-100 bg-gradient-to-br from-purple-50 to-white p-5 rounded-2xl shadow-sm">
+                                                <p className="text-purple-700 text-sm font-bold uppercase tracking-wider mb-1">Active Drivers</p>
+                                                <p className="text-4xl font-black text-slate-900">{displayData.kpis.totalDrivers.toLocaleString()}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Simple Chart / Leaderboard */}
+                                        <div className="border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                            <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">Top Performance (SAR)</h3>
+                                            <div className="space-y-5">
+                                                {displayData.drivers.slice(0, 8).map((d, i) => {
+                                                    const maxVal = displayData.drivers.length > 0 ? displayData.drivers[0].dTotal : 1;
+                                                    const pct = Math.max(2, (d.dTotal / maxVal) * 100);
+                                                    return (
+                                                        <div key={d.driverId} className="flex items-center gap-4">
+                                                            <div className="w-8 text-center text-slate-400 font-bold">#{i+1}</div>
+                                                            <div className="w-48 truncate text-sm font-semibold text-slate-700" title={d.driverName}>{d.driverName || d.driverId}</div>
+                                                            <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden relative">
+                                                                <div className="bg-blue-500 h-full rounded-full transition-all duration-1000" style={{width: `${pct}%`}}></div>
+                                                            </div>
+                                                            <div className="w-28 text-right font-bold text-slate-900 text-sm">{d.dTotal.toFixed(2)}</div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* LEDGER TAB */}
+                                {activeTab === 'ledger' && (
+                                    <div className="overflow-x-auto animate-fade-in">
+                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                            <thead className="bg-slate-100 text-slate-600 text-xs uppercase font-bold tracking-wider">
+                                                <tr>
+                                                    <th className="px-6 py-4">Driver Details</th>
+                                                    <th className="px-6 py-4 text-center">Valid Trips</th>
+                                                    <th className="px-6 py-4 text-right">Local</th>
+                                                    <th className="px-6 py-4 text-right">Upcountry</th>
+                                                    <th className="px-6 py-4 text-right">2nd Trip</th>
+                                                    <th className="px-6 py-4 text-right">Pallet</th>
+                                                    <th className="px-6 py-4 text-right">Other</th>
+                                                    <th className="px-6 py-4 text-right text-slate-900 bg-slate-200/50">Total (SAR)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                                                {displayData.drivers.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan="8" className="px-6 py-12 text-center text-slate-500">No matching records found.</td>
+                                                    </tr>
+                                                ) : displayData.drivers.map((driver) => (
+                                                    <Fragment key={driver.driverId}>
+                                                        <tr className="hover:bg-slate-50 transition-colors cursor-pointer group" onClick={() => toggleDriver(driver.driverId)}>
+                                                            <td className="px-6 py-4 flex items-center gap-3">
+                                                                <div className="text-slate-400 group-hover:text-blue-500 transition-colors">
+                                                                    {expandedDrivers[driver.driverId] ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-bold text-slate-900">{driver.driverName || 'Unknown Name'}</div>
+                                                                    <div className="text-xs text-slate-500 font-mono mt-0.5">{driver.driverId}</div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-full text-xs font-bold">{driver.trips.length}</span>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right font-medium">{driver.dLocal.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 text-right font-medium">{driver.dUpc.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 text-right font-medium">{driver.dSecond.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 text-right font-medium">{driver.dPallet.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 text-right font-medium">{driver.dOther.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 text-right font-black text-slate-900 bg-slate-50 text-base">{driver.dTotal.toFixed(2)}</td>
+                                                        </tr>
+                                                        
+                                                        {expandedDrivers[driver.driverId] && (
+                                                            <tr>
+                                                                <td colSpan={8} className="bg-slate-900 p-0 border-t-0 shadow-inner">
+                                                                    <div className="p-6">
+                                                                        <div className="rounded-xl border border-slate-700 overflow-hidden bg-slate-800">
+                                                                            <table className="w-full text-xs text-left">
+                                                                                <thead className="bg-slate-900 text-slate-400 border-b border-slate-700">
+                                                                                    <tr>
+                                                                                        <th className="px-3 py-2">Date</th>
+                                                                                        <th className="px-3 py-2">Identifiers (Trip / Order / Inv)</th>
+                                                                                        <th className="px-3 py-2">System/Vehicle</th>
+                                                                                        <th className="px-3 py-2">Routing</th>
+                                                                                        <th className="px-3 py-2 text-right">Orig Qty</th>
+                                                                                        <th className="px-3 py-2 text-right text-rose-400">Total Ret.</th>
+                                                                                        <th className="px-3 py-2 text-right text-white font-bold">Net Qty</th>
+                                                                                        <th className="px-3 py-2 text-right text-purple-300" title="Dispatched / Returned">Plt (Disp/Ret)</th>
+                                                                                        <th className="px-3 py-2 text-right text-blue-300">Allowances (SAR)</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody className="divide-y divide-slate-700 text-slate-300">
+                                                                                    {driver.trips.map((trip, idx) => (
+                                                                                        <tr key={idx} className="hover:bg-slate-700/50 transition-colors">
+                                                                                            <td className="px-3 py-2 whitespace-nowrap">{trip.date}</td>
+                                                                                            <td className="px-3 py-2">
+                                                                                                <div className="flex flex-col gap-0.5">
+                                                                                                    {trip.tripId && <span className="font-mono text-blue-300">T: {trip.tripId}</span>}
+                                                                                                    {trip.orderNo && <span className="font-mono text-emerald-300">O: {trip.orderNo}</span>}
+                                                                                                    {trip.invoiceNo && <span className="font-mono text-purple-300">I: {trip.invoiceNo}</span>}
+                                                                                                </div>
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2">
+                                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${trip.source === 'DDR' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-emerald-500/20 text-emerald-300'}`}>{trip.source}</span>
+                                                                                                    <span className="text-[10px] font-bold">{trip.tonnage}T</span>
+                                                                                                </div>
+                                                                                                <div className="text-[10px] text-slate-400">{trip.vehicleNo || trip.vehicleType}</div>
+                                                                                                <div className="text-[10px] text-slate-500 uppercase truncate max-w-[100px]">{trip.status}</div>
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2">
+                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                    <span className={`w-2 h-2 rounded-full shrink-0 ${trip.isLocal ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                                                                                                    <span className="truncate max-w-[150px]" title={trip.pathStr}>{trip.pathStr}</span>
+                                                                                                </div>
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-right">
+                                                                                                {trip.originalQty !== trip.qty ? (
+                                                                                                    <div className="flex flex-col items-end">
+                                                                                                        <span className="line-through text-slate-500">{trip.originalQty}</span>
+                                                                                                        <span className="text-emerald-400 font-bold">{trip.qty}</span>
+                                                                                                    </div>
+                                                                                                ) : trip.qty}
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-right">
+                                                                                                {trip.totalRet > 0 ? (
+                                                                                                    <div className="flex flex-col items-end text-rose-400">
+                                                                                                        <span className="font-bold">-{trip.totalRet}</span>
+                                                                                                        {trip.partialRetCases > 0 && <span className="text-[9px]">({trip.partialRetCases} PR)</span>}
+                                                                                                    </div>
+                                                                                                ) : '-'}
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-right font-black text-white bg-slate-700/30">{trip.netQty}</td>
+                                                                                            <td className="px-3 py-2 text-right">
+                                                                                                <span className="text-slate-400" title="Dispatched Pallets">{trip.palletsDispatched}</span>
+                                                                                                <span className="text-slate-500 mx-1">/</span>
+                                                                                                <span className="text-purple-400 font-bold" title="Returned Pallets">{trip.palletsReturned}</span>
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-right">
+                                                                                                <div className="flex justify-end gap-1 flex-wrap max-w-[150px]">
+                                                                                                    {trip.localAllow > 0 && <span className="bg-emerald-900/40 text-emerald-300 px-1 py-0.5 rounded border border-emerald-800/50">L:{trip.localAllow.toFixed(0)}</span>}
+                                                                                                    {trip.upcAllow > 0 && <span className="bg-amber-900/40 text-amber-300 px-1 py-0.5 rounded border border-amber-800/50">U:{trip.upcAllow.toFixed(0)}</span>}
+                                                                                                    {trip.secondAllow > 0 && <span className="bg-blue-900/40 text-blue-300 px-1 py-0.5 rounded border border-blue-800/50">2:{trip.secondAllow.toFixed(0)}</span>}
+                                                                                                    {trip.palletAllow > 0 && <span className="bg-purple-900/40 text-purple-300 px-1 py-0.5 rounded border border-purple-800/50">P:{trip.palletAllow.toFixed(0)}</span>}
+                                                                                                    {trip.otherAllow > 0 && <span className="bg-rose-900/40 text-rose-300 px-1 py-0.5 rounded border border-rose-800/50">S:{trip.otherAllow.toFixed(0)}</span>}
+                                                                                                    <span className="font-black text-white w-full mt-0.5">{trip.tripTotal.toFixed(1)}</span>
+                                                                                                </div>
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    ))}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </Fragment>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {/* TRUCKS TAB */}
+                                {activeTab === 'trucks' && (
+                                    <div className="overflow-x-auto animate-fade-in">
+                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                            <thead className="bg-slate-100 text-slate-600 text-xs uppercase font-bold tracking-wider">
+                                                <tr>
+                                                    <th className="px-6 py-4">Truck Details</th>
+                                                    <th className="px-6 py-4 text-center">Active Days</th>
+                                                    <th className="px-6 py-4 text-center">Total Trips</th>
+                                                    <th className="px-6 py-4 text-right">Net Cases Delivered</th>
+                                                    <th className="px-6 py-4 text-right" title="Indication Only">Dispatched Pallets</th>
+                                                    <th className="px-6 py-4 text-right text-purple-600">Returned Pallets (Payable)</th>
+                                                    <th className="px-6 py-4 text-right text-slate-900 bg-slate-200/50">Allowances Generated (SAR)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                                                {displayData.trucks.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan="6" className="px-6 py-12 text-center text-slate-500">No matching truck records found.</td>
+                                                    </tr>
+                                                ) : displayData.trucks.map((truck) => (
+                                                    <Fragment key={truck.vehicleNo}>
+                                                        <tr className="hover:bg-slate-50 transition-colors cursor-pointer group" onClick={() => toggleTruck(truck.vehicleNo)}>
+                                                            <td className="px-6 py-4 flex items-center gap-3">
+                                                                <div className="text-slate-400 group-hover:text-blue-500 transition-colors">
+                                                                    {expandedTrucks[truck.vehicleNo] ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-bold text-slate-900 text-base">{truck.vehicleNo}</div>
+                                                                    <div className="text-xs text-slate-500 font-mono mt-0.5">{truck.tonnage}T • {truck.vehicleType || 'N/A'}</div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <span className="bg-amber-100 text-amber-800 py-1 px-3 rounded-full text-xs font-bold">{truck.activeDays} Days</span>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-full text-xs font-bold">{truck.totalTrips} Trips</span>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right font-black text-emerald-600">{truck.totalQty.toLocaleString(undefined, {maximumFractionDigits:1})} CS</td>
+                                                            <td className="px-6 py-4 text-right font-bold text-slate-500">{truck.totalPalletsDispatched.toLocaleString()} PLT</td>
+                                                            <td className="px-6 py-4 text-right font-black text-purple-600">{truck.totalPalletsReturned.toLocaleString()} PLT</td>
+                                                            <td className="px-6 py-4 text-right font-black text-slate-900 bg-slate-50 text-base">{truck.totalAllowance.toFixed(2)}</td>
+                                                        </tr>
+                                                        
+                                                        {expandedTrucks[truck.vehicleNo] && (
+                                                            <tr>
+                                                                <td colSpan={6} className="bg-slate-900 p-0 border-t-0 shadow-inner">
+                                                                    <div className="p-6">
+                                                                        <div className="space-y-4">
+                                                                            {truck.tripsByDate.map((dateGroup, idx) => (
+                                                                                <div key={idx} className="rounded-xl border border-slate-700 overflow-hidden bg-slate-800">
+                                                                                    <div className="bg-slate-900/80 px-4 py-2 border-b border-slate-700 flex justify-between items-center">
+                                                                                        <div className="font-bold text-white flex items-center gap-2">
+                                                                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span> {dateGroup.date}
+                                                                                        </div>
+                                                                                        <div className="text-xs text-slate-400 font-medium">
+                                                                                            <span className="text-emerald-400">{dateGroup.dailyQty.toLocaleString()} CS</span> • 
+                                                                                            <span className="text-slate-400 ml-1">{dateGroup.dailyPalletsDispatched.toLocaleString()} Disp. PLT</span> • 
+                                                                                            <span className="text-purple-400 ml-1">{dateGroup.dailyPalletsReturned.toLocaleString()} Ret. PLT</span> • 
+                                                                                            <span className="text-blue-300 ml-1">{dateGroup.dailyAllow.toFixed(2)} SAR</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <table className="w-full text-xs text-left">
+                                                                                        <thead className="bg-slate-800 text-slate-400 border-b border-slate-700">
+                                                                                            <tr>
+                                                                                                <th className="px-4 py-2">Driver</th>
+                                                                                                <th className="px-4 py-2">Identifiers</th>
+                                                                                                <th className="px-4 py-2">Routing</th>
+                                                                                                <th className="px-4 py-2 text-right">Net Qty</th>
+                                                                                                <th className="px-4 py-2 text-right">Disp. Pallets</th>
+                                                                                                <th className="px-4 py-2 text-right">Ret. Pallets</th>
+                                                                                                <th className="px-4 py-2 text-right">Trip Total</th>
+                                                                                            </tr>
+                                                                                        </thead>
+                                                                                        <tbody className="divide-y divide-slate-700/50 text-slate-300">
+                                                                                            {dateGroup.trips.map((trip, tIdx) => (
+                                                                                                <tr key={tIdx} className="hover:bg-slate-700/30 transition-colors">
+                                                                                                    <td className="px-4 py-2">
+                                                                                                        <div className="font-medium text-slate-200">{trip.driverName}</div>
+                                                                                                        <div className="text-[10px] text-slate-500">{trip.driverId}</div>
+                                                                                                    </td>
+                                                                                                    <td className="px-4 py-2">
+                                                                                                        <div className="flex gap-1 mb-0.5">
+                                                                                                            <span className={`px-1 rounded text-[9px] font-bold ${trip.source === 'DDR' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-emerald-500/20 text-emerald-300'}`}>{trip.source}</span>
+                                                                                                        </div>
+                                                                                                        <div className="text-[10px] text-slate-400">Order: {trip.orderNo || 'N/A'}</div>
+                                                                                                        <div className="text-[10px] text-slate-400">Trip: {trip.tripId || 'N/A'}</div>
+                                                                                                    </td>
+                                                                                                    <td className="px-4 py-2 text-[11px] max-w-[200px] truncate" title={trip.pathStr}>{trip.pathStr}</td>
+                                                                                                    <td className="px-4 py-2 text-right font-bold text-white bg-slate-700/20">{trip.netQty}</td>
+                                                                                                    <td className="px-4 py-2 text-right font-medium text-slate-400">{trip.palletsDispatched}</td>
+                                                                                                    <td className="px-4 py-2 text-right font-bold text-purple-400">{trip.palletsReturned}</td>
+                                                                                                    <td className="px-4 py-2 text-right font-medium text-blue-300">{trip.tripTotal.toFixed(2)}</td>
+                                                                                                </tr>
+                                                                                            ))}
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </Fragment>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
