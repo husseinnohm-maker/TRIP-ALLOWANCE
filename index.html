@@ -115,124 +115,138 @@
             };
 
             const toggleTruck = (truckId) => {
-            setExpandedTrucks(prev => ({ ...prev, [truckId]: !prev[truckId] }));
-        };
+                setExpandedTrucks(prev => ({ ...prev, [truckId]: !prev[truckId] }));
+            };
 
-        const formatDateStr = (val) => {
-            if (!val) return '';
-            
-            // Handle native Excel Serial Numbers mathematically to completely avoid timezone drift
-            if (typeof val === 'number') {
-                // Excel epoch starts on Jan 1, 1900.
-                // 25569 is the difference in days between 1900-01-01 and 1970-01-01 (Unix Epoch)
-                const unixTimestampInMs = (val - 25569) * 86400 * 1000;
-                // Add 12 hours (43200000 ms) to force the time to NOON UTC, avoiding any midnight timezone rollbacks
-                const d = new Date(unixTimestampInMs + 43200000); 
-                const y = d.getUTCFullYear();
-                const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-                const day = String(d.getUTCDate()).padStart(2, '0');
-                return `${y}-${m}-${day}`;
-            }
-
-            if (val instanceof Date) {
-                // Force to NOON locally before extracting to avoid timezone shift pushing it back a day
-                const safeDate = new Date(val.getTime() + (12 * 60 * 60 * 1000));
-                const y = safeDate.getFullYear();
-                const m = String(safeDate.getMonth() + 1).padStart(2, '0');
-                const d = String(safeDate.getDate()).padStart(2, '0');
-                return `${y}-${m}-${d}`;
-            }
-            const strVal = String(val).trim();
-            
-            // Handle formats like DD/MM/YYYY or DD-MM-YYYY
-            const parts = strVal.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-            if (parts) {
-                let m = parseInt(parts[2], 10);
-                let d = parseInt(parts[1], 10);
-                if (m > 12) { const tmp = m; m = d; d = tmp; }
-                return `${parts[3]}-${m.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
-            }
-
-            // Match YYYY-MM-DD strictly
-            const isoParts = strVal.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-            if (isoParts) {
-                return `${isoParts[1]}-${isoParts[2].padStart(2,'0')}-${isoParts[3].padStart(2,'0')}`;
-            }
-
-            const monthMap = { 'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12 };
-            const strParts = strVal.split(/[-/ ]/);
-            if (strParts.length === 3) {
-                const d = parseInt(strParts[0], 10);
-                const mStr = strParts[1].toLowerCase().substring(0,3);
-                const m = monthMap[mStr];
-                let y = parseInt(strParts[2], 10);
+            const formatDateStr = (val) => {
+                if (!val) return '';
                 
-                if (m && !isNaN(d) && !isNaN(y)) {
-                    if (y < 100) y += 2000;
-                    return `${y}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+                // Handle native Excel Serial Numbers mathematically to completely avoid timezone drift
+                if (typeof val === 'number') {
+                    // Excel epoch starts on Jan 1, 1900.
+                    // 25569 is the difference in days between 1900-01-01 and 1970-01-01 (Unix Epoch)
+                    const unixTimestampInMs = (val - 25569) * 86400 * 1000;
+                    // Add 12 hours (43200000 ms) to force the time to NOON UTC, avoiding any midnight timezone rollbacks
+                    const d = new Date(unixTimestampInMs + 43200000); 
+                    const y = d.getUTCFullYear();
+                    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const day = String(d.getUTCDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}`;
                 }
-            }
 
-            const parsed = new Date(strVal);
-            if (!isNaN(parsed.getTime())) {
-                const py = parsed.getFullYear();
-                const pm = String(parsed.getMonth() + 1).padStart(2, '0');
-                const pd = String(parsed.getDate()).padStart(2, '0');
-                return `${py}-${pm}-${pd}`;
-            }
-            return strVal.split(' ')[0];
-        };
+                if (val instanceof Date) {
+                    // Force to NOON locally before extracting to avoid timezone shift pushing it back a day
+                    const safeDate = new Date(val.getTime() + (12 * 60 * 60 * 1000));
+                    const y = safeDate.getFullYear();
+                    const m = String(safeDate.getMonth() + 1).padStart(2, '0');
+                    const d = String(safeDate.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+                const strVal = String(val).trim();
+                
+                // Handle formats like DD/MM/YYYY or DD-MM-YYYY
+                const parts = strVal.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+                if (parts) {
+                    let m = parseInt(parts[2], 10);
+                    let d = parseInt(parts[1], 10);
+                    if (m > 12) { const tmp = m; m = d; d = tmp; }
+                    return `${parts[3]}-${m.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
+                }
 
-        const parseExcelFile = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        // Removed cellDates: true. We want raw values (numbers) for dates so we can mathematically convert them without browser timezone interference.
-                        const workbook = window.XLSX.read(data, { type: 'array' });
-                        const firstSheetName = workbook.SheetNames[0];
-                        const firstSheet = workbook.Sheets[firstSheetName];
-                        const jsonData = window.XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
-                        resolve(jsonData);
-                    } catch (err) {
-                        reject(err);
+                // Match YYYY-MM-DD strictly
+                const isoParts = strVal.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                if (isoParts) {
+                    return `${isoParts[1]}-${isoParts[2].padStart(2,'0')}-${isoParts[3].padStart(2,'0')}`;
+                }
+
+                const monthMap = { 'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12 };
+                const strParts = strVal.split(/[-/ ]/);
+                if (strParts.length === 3) {
+                    const d = parseInt(strParts[0], 10);
+                    const mStr = strParts[1].toLowerCase().substring(0,3);
+                    const m = monthMap[mStr];
+                    let y = parseInt(strParts[2], 10);
+                    
+                    if (m && !isNaN(d) && !isNaN(y)) {
+                        if (y < 100) y += 2000;
+                        return `${y}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
                     }
-                };
-                reader.onerror = (err) => reject(err);
-                reader.readAsArrayBuffer(file);
-            });
-        };
-        
-        // Parses Excel assigning column letters (A, B, C...) as keys
-        const parseExcelFileWithLetters = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        // Removed cellDates: true here as well
-                        const workbook = window.XLSX.read(data, { type: 'array' });
-                        const firstSheetName = workbook.SheetNames[0];
-                        const firstSheet = workbook.Sheets[firstSheetName];
-                        const jsonData = window.XLSX.utils.sheet_to_json(firstSheet, { header: "A", defval: "" });
-                        resolve(jsonData);
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-                reader.onerror = (err) => reject(err);
-                reader.readAsArrayBuffer(file);
-            });
-        };
+                }
 
-        const normalizeRow = (row, source) => {
+                const parsed = new Date(strVal);
+                if (!isNaN(parsed.getTime())) {
+                    const py = parsed.getFullYear();
+                    const pm = String(parsed.getMonth() + 1).padStart(2, '0');
+                    const pd = String(parsed.getDate()).padStart(2, '0');
+                    return `${py}-${pm}-${pd}`;
+                }
+                return strVal.split(' ')[0];
+            };
+
+            const parseExcelFile = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            // Removed cellDates: true. We want raw values (numbers) for dates so we can mathematically convert them without browser timezone interference.
+                            const workbook = window.XLSX.read(data, { type: 'array' });
+                            const firstSheetName = workbook.SheetNames[0];
+                            const firstSheet = workbook.Sheets[firstSheetName];
+                            const jsonData = window.XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+                            resolve(jsonData);
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    reader.onerror = (err) => reject(err);
+                    reader.readAsArrayBuffer(file);
+                });
+            };
+            
+            // Parses Excel assigning column letters (A, B, C...) as keys
+            const parseExcelFileWithLetters = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = window.XLSX.read(data, { type: 'array' });
+                            const firstSheetName = workbook.SheetNames[0];
+                            const firstSheet = workbook.Sheets[firstSheetName];
+                            const jsonData = window.XLSX.utils.sheet_to_json(firstSheet, { header: "A", defval: "" });
+                            resolve(jsonData);
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    reader.onerror = (err) => reject(err);
+                    reader.readAsArrayBuffer(file);
+                });
+            };
+
+            const normalizeRow = (row, source) => {
+                // Fixed getVal logic: Now uses a two-pass strict search.
+                // It ensures exact header matches (like "Order no" and "Zone") are prioritized 
+                // preventing "Order ID" from being accidentally captured when searching for "Order no".
                 const getVal = (possibleKeys) => {
-                    const key = Object.keys(row).find(k => {
-                        const norm = k.toLowerCase().trim().replace(/_/g, ' ');
-                        return possibleKeys.some(pk => norm === pk || norm.includes(pk));
-                    });
-                    return key !== undefined ? row[key] : '';
+                    // Pass 1: Strict Exact Match based on the order of possibleKeys
+                    for (const pk of possibleKeys) {
+                        const key = Object.keys(row).find(k => {
+                            const norm = k.toLowerCase().trim().replace(/[_\-]/g, ' ');
+                            return norm === pk;
+                        });
+                        if (key !== undefined) return row[key];
+                    }
+                    // Pass 2: Partial Match Fallback
+                    for (const pk of possibleKeys) {
+                        const key = Object.keys(row).find(k => {
+                            const norm = k.toLowerCase().trim().replace(/[_\-]/g, ' ');
+                            return norm.includes(pk);
+                        });
+                        if (key !== undefined) return row[key];
+                    }
+                    return '';
                 };
 
                 const driverId = String(getVal(['driver id', 'drivercode', 'driver code', 'driver #', 'emp id', 'employee id']) || '').trim();
@@ -513,14 +527,13 @@
                         
                         // Link standalone OOS lines to actual drivers if tripId matches an existing DDR/TMS row
                         // Otherwise, group by whatever driverId we generated for OOS.
-                        // Let's create a core Trip key strictly based on Date and TripID and Truck for consolidation.
                         const consolidatedKey = `${r.date}_${truckKey}_${identifier}`;
                         
                         if (!tripsMap[consolidatedKey]) {
                             tripsMap[consolidatedKey] = { ...r, qty: 0, retCases: 0, partialRetCases: 0, totalRet: 0, palletsDispatched: 0, palletsReturned: 0, destinations: [] };
                         }
                         
-                        // If current row is DDR/TMS (has valid driver) and existing map has OOS pseudo-driver, inherit real driver!
+                        // If current row is DDR/TMS (has valid driver) and existing map has OOS pseudo-driver, inherit real driver
                         if (r.source !== 'OOS' && r.driverId && !r.driverId.startsWith('OOS_')) {
                             tripsMap[consolidatedKey].driverId = r.driverId;
                             tripsMap[consolidatedKey].driverName = r.driverName;
@@ -587,41 +600,34 @@
                             dailyTrips.forEach((trip, index) => {
                                 const netQty = Math.max(0, trip.qty - trip.totalRet);
                                 
-                                // FIX: Extract ALL delivery destinations by ignoring ONLY the specific origin warehouse hub
                                 let dests = trip.destinations;
                                 const originCity = getHomeCityFromSite(trip.siteRef);
                                 
                                 let nonHomeDests = dests.filter(dest => {
                                     const destLower = String(dest).toLowerCase();
                                     if (originCity) {
-                                        // Ignore variations of Khamis Mushayet if origin is Khamis
                                         if (originCity === 'KHAMIS' && destLower.includes('mushayet')) return false;
-                                        // Ignore the exact origin city (e.g. ignore Jeddah if starting from QW1)
                                         return !destLower.includes(originCity.toLowerCase());
                                     }
-                                    // If origin is totally unknown, trust all provided destinations
                                     return true;
                                 });
                                 
-                                // Evaluate all non-home destinations. If none exist (local trip), evaluate all.
                                 let evalDests = nonHomeDests.length > 0 ? nonHomeDests : (dests.length > 0 ? dests : ['Unknown']);
                                 
-                                let isLocal = true; // Assume local until proven otherwise
+                                let isLocal = true;
                                 let localAllow = 0, upcAllow = 0, oosAllow = 0, einvoiceAllow = 0, secondAllow = 0;
                                 let palletAllow = trip.palletsReturned * settings.palletRate;
                                 let otherAllow = trip.isOther ? settings.otherTripRate : 0;
                                 
                                 let highestRate = -1;
-                                let primaryDest = evalDests[0]; // Track which destination yielded the highest rate
+                                let primaryDest = evalDests[0];
 
-                                // Overrides for OOS sheet data
                                 if (trip.oosType) {
-                                    isLocal = false; // By definition out of standard scope
+                                    isLocal = false; 
                                     const upperType = trip.oosType.toUpperCase();
                                     const isStrCross = upperType.includes('STR') || upperType.includes('CROSS') || upperType.includes('DOCK');
                                     const isEinv = upperType.includes('EINVOICE') || upperType.includes('E-INV') || upperType.includes('E INVOICE');
                                     
-                                    // Evaluate all destinations for this trip and find the highest rate
                                     evalDests.forEach(d => {
                                         const destKey = String(d).trim().toUpperCase();
                                         if (isStrCross) {
@@ -638,14 +644,12 @@
                                     if (isStrCross) oosAllow = Math.max(0, highestRate);
                                     if (isEinv) einvoiceAllow = Math.max(0, highestRate);
                                     
-                                    // Apply 2nd trip based on regular daily trip count
                                     if (index > 0) {
                                         if (trip.tonnage === 20) secondAllow = settings.secondTrip20t;
                                         else if (trip.tonnage >= 7) secondAllow = settings.secondTrip7t10t;
                                         else secondAllow = settings.secondTrip5t;
                                     }
                                 } else {
-                                    // Standard calculation for DDR/TMS
                                     evalDests.forEach(d => {
                                         const finalDestLower = String(d).toLowerCase().trim();
                                         const destKey = String(d).trim().toUpperCase();
@@ -669,7 +673,7 @@
                                         }
 
                                         if (!destIsLocal) {
-                                            isLocal = false; // Entire trip is flagged as Upcountry if AT LEAST ONE dest is Upcountry
+                                            isLocal = false; 
                                             if (destKey) discoveredUpc.add(destKey);
                                             const rate = upcountryRates[destKey] !== undefined ? upcountryRates[destKey] : settings.upcountryDefaultRate;
                                             if (rate > highestRate) { highestRate = rate; primaryDest = d; }
@@ -871,7 +875,7 @@
                 applyPremiumStyling(wsTruck);
 
                 const detailedData = [];
-                const oosSpecificData = []; // New sheet array exclusively for Out of Scope
+                const oosSpecificData = []; 
 
                 displayData.drivers.forEach(d => {
                     d.trips.forEach(t => {
@@ -890,7 +894,6 @@
                         };
                         detailedData.push(rowData);
                         
-                        // Extract specifically mapped OOS items into their own sheet
                         if (t.source === 'OOS' || t.oosType) {
                             oosSpecificData.push(rowData);
                         }
@@ -908,7 +911,7 @@
                 window.XLSX.utils.book_append_sheet(wb, wsDriver, "Driver Ledger");
                 window.XLSX.utils.book_append_sheet(wb, wsTruck, "Truck Analysis");
                 window.XLSX.utils.book_append_sheet(wb, wsDetail, "Detailed Raw Data");
-                window.XLSX.utils.book_append_sheet(wb, wsOos, "Out of Scope Data"); // newly added sheet
+                window.XLSX.utils.book_append_sheet(wb, wsOos, "Out of Scope Data"); 
                 
                 window.XLSX.writeFile(wb, `Logistics_Allowance_Dashboard_${new Date().toISOString().split('T')[0]}.xlsx`);
             };
@@ -937,7 +940,6 @@
                             </div>
                         )}
 
-                        {}
                         {showSettings && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
                                 <div className="flex flex-col md:flex-row justify-between items-center border-b border-slate-200 bg-slate-50 overflow-x-auto">
@@ -995,7 +997,6 @@
                                     </div>
                                 )}
 
-                                {}
                                 {settingsTab === 'upcountry' && (
                                     <div className="p-6">
                                         <p className="text-sm text-slate-600 mb-4">Assign distinct flat rates (SAR) for Upcountry destinations. Populates after processing DDR/TMS.</p>
@@ -1064,7 +1065,6 @@
                             </div>
                         )}
 
-                        {}
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                             <div className="md:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><FileSpreadsheet className="text-blue-500"/> Reports Upload</h3>
@@ -1109,7 +1109,6 @@
                             </div>
                         </div>
 
-                        {}
                         {displayData && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-8">
                                 <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row gap-4 justify-between items-center overflow-x-auto">
@@ -1163,7 +1162,6 @@
                                     </div>
                                 )}
 
-                                {}
                                 {activeTab === 'ledger' && (
                                     <div className="overflow-x-auto animate-fade-in w-full">
                                         <table className="min-w-max w-full text-left text-sm whitespace-nowrap">
@@ -1278,7 +1276,6 @@
                                     </div>
                                 )}
 
-                                {}
                                 {activeTab === 'trucks' && (
                                     <div className="overflow-x-auto animate-fade-in w-full">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
