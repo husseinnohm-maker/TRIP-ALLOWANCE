@@ -206,31 +206,29 @@
             
             // Parses Excel assigning column letters (A, B, C...) as keys
             const parseExcelFileWithLetters = (file) => {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const data = new Uint8Array(e.target.result);
-                            const workbook = window.XLSX.read(data, { type: 'array' });
-                            const firstSheetName = workbook.SheetNames[0];
-                            const firstSheet = workbook.Sheets[firstSheetName];
-                            const jsonData = window.XLSX.utils.sheet_to_json(firstSheet, { header: "A", defval: "" });
-                            resolve(jsonData);
-                        } catch (err) {
-                            reject(err);
-                        }
-                    };
-                    reader.onerror = (err) => reject(err);
-                    reader.readAsArrayBuffer(file);
-                });
-            };
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        // Removed cellDates: true here as well
+                        const workbook = window.XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const firstSheet = workbook.Sheets[firstSheetName];
+                        const jsonData = window.XLSX.utils.sheet_to_json(firstSheet, { header: "A", defval: "" });
+                        resolve(jsonData);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                reader.onerror = (err) => reject(err);
+                reader.readAsArrayBuffer(file);
+            });
+        };
 
-            const normalizeRow = (row, source) => {
-                // Fixed getVal logic: Now uses a two-pass strict search.
-                // It ensures exact header matches (like "Order no" and "Zone") are prioritized 
-                // preventing "Order ID" from being accidentally captured when searching for "Order no".
+        const normalizeRow = (row, source) => {
                 const getVal = (possibleKeys) => {
-                    // Pass 1: Strict Exact Match based on the order of possibleKeys
+                    // Pass 1: Strict Exact Match based on the priority order of possibleKeys
                     for (const pk of possibleKeys) {
                         const key = Object.keys(row).find(k => {
                             const norm = k.toLowerCase().trim().replace(/[_\-]/g, ' ');
